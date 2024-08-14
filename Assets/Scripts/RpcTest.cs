@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class RpcTest : NetworkBehaviour
 {
-	public override void OnNetworkSpawn()
+	/*public override void OnNetworkSpawn()
 	{
 		if (!IsServer && IsOwner) // Only send an RPC to the server from the client that owns the NetworkObject of this NetworkBehaviour instance
 		{
@@ -26,5 +26,5 @@ public class RpcTest : NetworkBehaviour
 	{
 		Debug.Log($"Server Received the RPC #{value} on NetworkObject #{sourceNetworkObjectId}");
 		ClientAndHostRpc(value, sourceNetworkObjectId);
-	}
+	}*/
 }

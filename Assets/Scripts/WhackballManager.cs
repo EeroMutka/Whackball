@@ -10,11 +10,14 @@ public class WhackballManager : MonoBehaviour
 	void Awake()
 	{
 		networkManager = GetComponent<NetworkManager>();
+		// Debug.Log("Starting host");
+		// networkManager.StartHost();
 	}
-
+	
 	void OnGUI()
 	{
 		GUILayout.BeginArea(new Rect(10, 10, 300, 300));
+		// Debug.Log($"networkManager.IsClient {networkManager.IsClient} networkManager.IsServer {networkManager.IsServer}");
 		if (!networkManager.IsClient && !networkManager.IsServer)
 		{
 			StartButtons();
