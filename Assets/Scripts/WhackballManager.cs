@@ -5,6 +5,8 @@ using UnityEngine;
 
 public class WhackballManager : MonoBehaviour
 {
+	public GameObject camera;
+	
 	NetworkManager networkManager;
 	
 	void Awake()

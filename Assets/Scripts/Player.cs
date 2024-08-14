@@ -11,19 +11,25 @@ public class Player : NetworkBehaviour
 	public GameObject HandVizR;
 	
 	public CharacterController characterController;
+	public WhackballManager whackballManager;
 	
 	// networked variables, automatically replicated from server to clients
 	// -transform.position is implicitly like this
 	public NetworkVariable<Vector2> armPos2D;
 	
+	
+	// valid on server + client
+	public int fieldSide; // -1 for z < 0, +1 for z > 0
+	
 	// server-only variables
+	public bool serverHasInitialized = false;
 	public float lastInputMoveX = 0f;
 	public float lastInputMoveY = 0f;
 	public Vector3 velocity;
 	public Vector3 lastArmVel;
 	
-	
 	// owning-client-only variables
+	float cameraDirection = 1f;
 	public float prevMouseX;
 	public float prevMouseY;
 	public Vector2 clientTargetArmPos2D;
@@ -34,7 +40,33 @@ public class Player : NetworkBehaviour
 	void Start()
 	{
 		characterController = GetComponent<CharacterController>();
+		
+		GameObject networkManagerObject = GameObject.Find("NetworkManager");
+		whackballManager = networkManagerObject.GetComponent<WhackballManager>();
+		
+		fieldSide = OwnerClientId % 2 == 0 ? 1 : -1;
+		
+		// float forwardDir =  ? 1f : -1f;
+		if (IsClient && IsOwner) {
+			cameraDirection = -(float)fieldSide;
+			if (fieldSide > 0) {
+				Vector3 cam_pos = whackballManager.camera.transform.position;
+				Vector3 cam_rot = whackballManager.camera.transform.localEulerAngles;
+				whackballManager.camera.transform.position = new Vector3(cam_pos.x, cam_pos.y, -cam_pos.z);
+				whackballManager.camera.transform.localEulerAngles = new Vector3(cam_rot.x, cam_rot.y + 180, cam_rot.z);
+			}
+		}
+		
 	}
+	
+	/*public override void OnNetworkSpawn() {
+		base.OnNetworkSpawn();
+		
+		if (IsServer) {
+			// transform.position = new Vector3(0, 10f, 10f);
+			
+		}
+	}*/
 	
 	[Rpc(SendTo.Server, Delivery = RpcDelivery.Unreliable)]
 	void SendPerFrameInputToServerRpc(float moveX, float moveY, float armPosX, float armPosY, Vector3 armVel) {
@@ -47,7 +79,7 @@ public class Player : NetworkBehaviour
 	[Rpc(SendTo.Server, Delivery = RpcDelivery.Unreliable)]
 	void SendJumpInputToServerRpc() {
 		if (characterController.isGrounded) {
-			velocity = new Vector3(velocity.x, 6f, velocity.z);
+			velocity = new Vector3(velocity.x, 7f, velocity.z);
 		}
 	}
 	
@@ -61,20 +93,26 @@ public class Player : NetworkBehaviour
 	void Update()
 	{
 		if (IsServer) {
-			float moveSpeed = 5f;
+			const float moveSpeed = 5f;
 			
 			velocity = new Vector3(lastInputMoveX*moveSpeed, velocity.y - 15f * Time.deltaTime, lastInputMoveY*moveSpeed);
 			
 			characterController.Move(velocity * Time.deltaTime);
 			
 			if (characterController.isGrounded) velocity = new Vector3(velocity.x, 0, velocity.z);
+
+			// for some reason this only works after calling characterController.Move(), not before.
+			if (!serverHasInitialized) {
+				transform.position = new Vector3(0, 4f, (float)fieldSide * 4f);
+				serverHasInitialized = true;
+			}
 		}
 		
 		if (IsClient && IsOwner && Application.isFocused) {
 			float mouseX = Input.mousePosition.x / (float)Screen.height;
 			float mouseY = Input.mousePosition.y / (float)Screen.height;
-			float mouseDx = mouseX - prevMouseX;
-			float mouseDy = mouseY - prevMouseY;
+			float mouseDx = cameraDirection * (mouseX - prevMouseX);
+			float mouseDy = cameraDirection * (mouseY - prevMouseY);
 			
 			clientTargetArmPos2D += 3f * new Vector2(mouseDx, mouseDy);
 			if (clientTargetArmPos2D.magnitude > 1) {
@@ -90,8 +128,8 @@ public class Player : NetworkBehaviour
 			
 			Vector3 armVel = (targetHandPos - oldHandPos) / Time.deltaTime;
 			
-			float moveX = Input.GetAxis("Horizontal");
-			float moveY = Input.GetAxis("Vertical");
+			float moveX = Input.GetAxis("Horizontal") * cameraDirection;
+			float moveY = Input.GetAxis("Vertical") * cameraDirection;
 			SendPerFrameInputToServerRpc(moveX, moveY, clientLazyArmPos2D.x, clientLazyArmPos2D.y, armVel);
 			
 			prevMouseX = mouseX;
