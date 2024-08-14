@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
-public class WhackballManager : MonoBehaviour
+public class WhackNetManager : MonoBehaviour
 {
-	public GameObject camera;
-	
 	NetworkManager networkManager;
+	GameManager game;
 	
 	void Awake()
 	{
 		networkManager = GetComponent<NetworkManager>();
+		game = GameObject.Find("GameManager").GetComponent<GameManager>();
 		// Debug.Log("Starting host");
 		// networkManager.StartHost();
 	}
@@ -19,7 +19,7 @@ public class WhackballManager : MonoBehaviour
 	void OnGUI()
 	{
 		GUILayout.BeginArea(new Rect(10, 10, 300, 300));
-		// Debug.Log($"networkManager.IsClient {networkManager.IsClient} networkManager.IsServer {networkManager.IsServer}");
+		
 		if (!networkManager.IsClient && !networkManager.IsServer)
 		{
 			StartButtons();
@@ -27,18 +27,35 @@ public class WhackballManager : MonoBehaviour
 		else
 		{
 			StatusLabels();
-			SubmitNewPosition();
+			
+			if (!game.gameHasStarted.Value) {
+				if (networkManager.IsServer) {
+					if (GUILayout.Button("Start Game")) {
+						game.StartGame();
+					}
+				}
+				else {
+					GUILayout.Label("Waiting for the host to start the game...");
+				}
+			}
+			
 		}
 
 		GUILayout.EndArea();
 	}
 
+	[Rpc(SendTo.Server)]
+	void OnStartGame() {
+	}
+	
 	void StartButtons()
 	{
 		if (GUILayout.Button("Host")) networkManager.StartHost();
 		if (GUILayout.Button("Client")) networkManager.StartClient();
 		if (GUILayout.Button("Server")) networkManager.StartServer();
 	}
+	
+	// void LaunchBall
 	
 	void StatusLabels()
 	{
@@ -50,21 +67,4 @@ public class WhackballManager : MonoBehaviour
 		GUILayout.Label("Mode: " + mode);
 	}
 	
-	void SubmitNewPosition()
-	{
-		/*if (GUILayout.Button(networkManager.IsServer ? "Move" : "Request Position Change"))
-		{
-			if (networkManager.IsServer && !networkManager.IsClient)
-			{
-				foreach (ulong uid in networkManager.ConnectedClientsIds)
-					networkManager.SpawnManager.GetPlayerNetworkObject(uid).GetComponent<Player>().Move();
-			}
-			else
-			{
-				var playerObject = networkManager.SpawnManager.GetLocalPlayerObject();
-				var player = playerObject.GetComponent<Player>();
-				player.Move();
-			}
-		}*/
-	}
 }

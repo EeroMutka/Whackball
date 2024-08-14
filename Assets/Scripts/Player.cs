@@ -11,12 +11,11 @@ public class Player : NetworkBehaviour
 	public GameObject HandVizR;
 	
 	public CharacterController characterController;
-	public WhackballManager whackballManager;
+	public GameManager game;
 	
 	// networked variables, automatically replicated from server to clients
 	// -transform.position is implicitly like this
 	public NetworkVariable<Vector2> armPos2D;
-	
 	
 	// valid on server + client
 	public int fieldSide; // -1 for z < 0, +1 for z > 0
@@ -41,8 +40,7 @@ public class Player : NetworkBehaviour
 	{
 		characterController = GetComponent<CharacterController>();
 		
-		GameObject networkManagerObject = GameObject.Find("NetworkManager");
-		whackballManager = networkManagerObject.GetComponent<WhackballManager>();
+		game = GameObject.Find("GameManager").GetComponent<GameManager>();
 		
 		fieldSide = OwnerClientId % 2 == 0 ? 1 : -1;
 		
@@ -50,10 +48,10 @@ public class Player : NetworkBehaviour
 		if (IsClient && IsOwner) {
 			cameraDirection = -(float)fieldSide;
 			if (fieldSide > 0) {
-				Vector3 cam_pos = whackballManager.camera.transform.position;
-				Vector3 cam_rot = whackballManager.camera.transform.localEulerAngles;
-				whackballManager.camera.transform.position = new Vector3(cam_pos.x, cam_pos.y, -cam_pos.z);
-				whackballManager.camera.transform.localEulerAngles = new Vector3(cam_rot.x, cam_rot.y + 180, cam_rot.z);
+				Vector3 cam_pos = game.camera.transform.position;
+				Vector3 cam_rot = game.camera.transform.localEulerAngles;
+				game.camera.transform.position = new Vector3(cam_pos.x, cam_pos.y, -cam_pos.z);
+				game.camera.transform.localEulerAngles = new Vector3(cam_rot.x, cam_rot.y + 180, cam_rot.z);
 			}
 		}
 		
@@ -93,17 +91,19 @@ public class Player : NetworkBehaviour
 	void Update()
 	{
 		if (IsServer) {
-			const float moveSpeed = 5f;
-			
-			velocity = new Vector3(lastInputMoveX*moveSpeed, velocity.y - 15f * Time.deltaTime, lastInputMoveY*moveSpeed);
-			
-			characterController.Move(velocity * Time.deltaTime);
-			
-			if (characterController.isGrounded) velocity = new Vector3(velocity.x, 0, velocity.z);
+			if (game.gameHasStarted.Value) {
+				const float moveSpeed = 5f;
+				
+				velocity = new Vector3(lastInputMoveX*moveSpeed, velocity.y - 15f * Time.deltaTime, lastInputMoveY*moveSpeed);
+				
+				characterController.Move(velocity * Time.deltaTime);
+				
+				if (characterController.isGrounded) velocity = new Vector3(velocity.x, 0, velocity.z);
+			}
 
 			// for some reason this only works after calling characterController.Move(), not before.
 			if (!serverHasInitialized) {
-				transform.position = new Vector3(0, 4f, (float)fieldSide * 4f);
+				transform.position = new Vector3(0, 0.5f, (float)fieldSide * 6f);
 				serverHasInitialized = true;
 			}
 		}
