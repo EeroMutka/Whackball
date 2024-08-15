@@ -164,11 +164,16 @@ public class Player : NetworkBehaviour
 		
 		// drawing
 		if (IsClient) {
-			float theta = armPos2D.Value.magnitude*armThetaScale;
+			Vector2 syncedArmPos = armPos2D.Value;
+			if (IsOwner) {
+				syncedArmPos = clientLazyArmPos2D; // if this is the owning client, we can just use the most up-to-date arm pos without the server roundtrip
+			}
+			
+			float theta = syncedArmPos.magnitude*armThetaScale;
 			float z = Mathf.Cos(theta);
 			float x = Mathf.Sin(theta);
 			
-			Vector2 armPos2DNorm = armPos2D.Value.normalized;
+			Vector2 armPos2DNorm = syncedArmPos.normalized;
 			// Vector3 armPos3D = new Vector3(armPos2DNorm.x, 0, armPos2DNorm.y)*x + new Vector3(0, z, 0);
 			
 			Vector3 rot = new Vector3(theta*Mathf.Rad2Deg, -Mathf.Atan2(armPos2DNorm.y, armPos2DNorm.x)*Mathf.Rad2Deg + 90, 0);

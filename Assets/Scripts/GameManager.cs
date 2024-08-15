@@ -16,13 +16,13 @@ public class GameManager : NetworkBehaviour
 	
 	public TextMeshProUGUI blueScoreText;
 	public TextMeshProUGUI orangeScoreText;
+	public TextMeshProUGUI winnerText;
 	
 	public NetworkVariable<int> blueScore;
 	public NetworkVariable<int> orangeScore;
 	
-	bool ballIsIdle = true;
-	
 	public NetworkVariable<bool> gameHasStarted;
+	public NetworkVariable<int> winnerSide; // 0 if neither
 	
 	public float clientCameraDirection = 1f;
 	
@@ -32,7 +32,11 @@ public class GameManager : NetworkBehaviour
 	
 	public void ResetBall(int side) {
 		ball.transform.position = new Vector3(0f, 1.5f, (float)side * 4f);
-		ball.isIdle = true;
+		ball.isIdle.Value = true;
+		
+		if (IsServer) { // we want the ball to snap instead of lerping on clients when the ball is teleported
+			ball.SendSnapBallPosRpc(ball.transform.position);
+		}
 	}
 	
 	// must be called by the server
@@ -51,11 +55,19 @@ public class GameManager : NetworkBehaviour
 			pointToSide *= -1;
 		}
 		
+		const int pointsToWin = 10;
+		
 		if (pointToSide > 0) { // +z is blue, -z is orange
 			blueScore.Value++;
+			if (blueScore.Value == pointsToWin && winnerSide.Value == 0) {
+				winnerSide.Value = 1;
+			}
 		}
 		else {
 			orangeScore.Value++;
+			if (orangeScore.Value == pointsToWin && winnerSide.Value == 0) {
+				winnerSide.Value = -1;
+			}
 		}
 		
 		// startTurnSide = -startTurnSide;
@@ -81,5 +93,9 @@ public class GameManager : NetworkBehaviour
 	{
 		blueScoreText.text = $"Blue: {blueScore.Value}";
 		orangeScoreText.text = $"Orange: {orangeScore.Value}";
+		
+		if (winnerSide.Value != 0) {
+			winnerText.text = winnerSide.Value > 0 ? "Blue wins!" : "Orange wins!";
+		}
 	}
 }

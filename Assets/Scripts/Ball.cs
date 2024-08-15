@@ -8,8 +8,9 @@ public class Ball : NetworkBehaviour
 	public GameManager game;
 	public Rigidbody rigidbody;
 	
+	public NetworkVariable<bool> isIdle;
+	
 	// server-only
-	public bool isIdle = true;
 	public int lastTouchedPlayerSide;
 	
 	void Start()
@@ -18,22 +19,36 @@ public class Ball : NetworkBehaviour
 		game = GameObject.Find("GameManager").GetComponent<GameManager>();
 	}
 
+	[Rpc(SendTo.ClientsAndHost, Delivery = RpcDelivery.Unreliable)]
+	void SendPerFramePosAndVelToClientsRpc(Vector3 position, Vector3 velocity) {
+		transform.position = Vector3.Lerp(transform.position, position, 0.3f); // adjust the position over time towards the truth
+		rigidbody.velocity = velocity;
+	}
+	
+	[Rpc(SendTo.ClientsAndHost)]
+	public void SendSnapBallPosRpc(Vector3 position) {
+		transform.position = position;
+	}
+	
 	void Update()
 	{
+		// do physics on both client and server
+		if (isIdle.Value) {
+			rigidbody.velocity = new Vector3(0, 0, 0);
+		}
+		else {
+			rigidbody.velocity = rigidbody.velocity + new Vector3(0, -5f*Time.deltaTime, 0);
+		}
+		
 		if (IsServer) {
-			if (!isIdle) {
-				rigidbody.velocity = rigidbody.velocity + new Vector3(0, -5f*Time.deltaTime, 0);
-			}
-			else {
-				rigidbody.velocity = new Vector3(0, 0, 0);
-			}
+			SendPerFramePosAndVelToClientsRpc(transform.position, rigidbody.velocity);
 		}
 	}
 	
 	void OnCollisionEnter(Collision collision)
 	{
 		if (IsServer) {
-			isIdle = false;
+			isIdle.Value = false;
 			
 			Player player = collision.gameObject.GetComponent<Player>();
 			if (player == null) {
