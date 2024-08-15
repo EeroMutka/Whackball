@@ -6,15 +6,14 @@ using UnityEngine;
 public class Ball : NetworkBehaviour
 {
 	public GameManager game;
-	
-	public Vector3 startPosition;
 	public Rigidbody rigidbody;
 	
+	// server-only
 	public bool isIdle = true;
+	public int lastTouchedPlayerSide;
 	
 	void Start()
 	{
-		startPosition = transform.position;
 		rigidbody = GetComponent<Rigidbody>();
 		game = GameObject.Find("GameManager").GetComponent<GameManager>();
 	}
@@ -45,6 +44,7 @@ public class Ball : NetworkBehaviour
 			
 			if (player) {
 				rigidbody.velocity = new Vector3(0.8f*player.lastArmVel.x, 0.5f*player.lastArmVel.y, 0.8f*player.lastArmVel.z) + player.velocity;
+				lastTouchedPlayerSide = player.fieldSide;
 			}
 			else if (collision.gameObject.tag == "Ground") {
 				game.OnBallHitGround();

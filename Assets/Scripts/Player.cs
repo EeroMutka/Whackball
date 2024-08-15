@@ -9,6 +9,9 @@ public class Player : NetworkBehaviour
 	public GameObject HandCapsuleOrigin;
 	public GameObject HandVizL;
 	public GameObject HandVizR;
+	public MeshRenderer[] Meshes;
+	public Material OrangeMaterial;
+	public Material BlueMaterial;
 	
 	public CharacterController characterController;
 	public GameManager game;
@@ -18,7 +21,7 @@ public class Player : NetworkBehaviour
 	public NetworkVariable<Vector2> armPos2D;
 	
 	// valid on server + client
-	public int fieldSide; // -1 for z < 0, +1 for z > 0
+	public int fieldSide; // -1 for z < 0, +1 for z > 0 (+z is blue, -z is orange)
 	
 	// server-only variables
 	public bool serverHasInitialized = false;
@@ -55,6 +58,14 @@ public class Player : NetworkBehaviour
 			}
 		}
 		
+		if (IsClient) {
+			List<Material> mats = new List<Material>();
+			mats.Add(fieldSide > 0 ? BlueMaterial : OrangeMaterial); // +z is blue, -z is orange
+			
+			for (int i = 0; i < Meshes.Length; i++) {
+				Meshes[i].SetMaterials(mats);
+			}
+		}
 	}
 	
 	/*public override void OnNetworkSpawn() {

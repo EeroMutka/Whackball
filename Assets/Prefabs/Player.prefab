@@ -878,9 +878,27 @@ MonoBehaviour:
   HandCapsuleOrigin: {fileID: 7630092471878215843}
   HandVizL: {fileID: 3930899446271072363}
   HandVizR: {fileID: 8935481340599839717}
+  Meshes:
+  - {fileID: 2592971864197483635}
+  - {fileID: 3614639102921176627}
+  - {fileID: 901517635156517849}
+  - {fileID: 4180071777452190524}
+  - {fileID: 6486251211664408125}
+  - {fileID: 5059690202368675996}
+  - {fileID: 82689086290069403}
+  - {fileID: 4801805978300271103}
+  - {fileID: 82689086290069403}
+  - {fileID: 4600865735455403232}
+  - {fileID: 6411557852392468965}
+  - {fileID: 5668753387323685715}
+  OrangeMaterial: {fileID: 2100000, guid: e74015ceec6c2ba4889fda3d8932487d, type: 2}
+  BlueMaterial: {fileID: 2100000, guid: c567242509c0f63409a73591250fd367, type: 2}
   characterController: {fileID: 0}
+  game: {fileID: 0}
   armPos2D:
     m_InternalValue: {x: 0, y: 0}
+  fieldSide: 0
+  serverHasInitialized: 0
   lastInputMoveX: 0
   lastInputMoveY: 0
   velocity: {x: 0, y: 0, z: 0}
