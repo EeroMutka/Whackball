@@ -2,9 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
+using TMPro;
 
 public class Player : NetworkBehaviour
 {
+	static readonly string[] emoteFromId = new string[]{"", "Hello", "Oh no...", "Whoops", "Yo", "What a shot!", "Unlucky...", "Great whack", "lol", "wtf"};
 	
 	public GameObject HandCapsuleOrigin;
 	public GameObject HandVizL;
@@ -13,12 +15,14 @@ public class Player : NetworkBehaviour
 	public Material OrangeMaterial;
 	public Material BlueMaterial;
 	
+	public TextMeshPro emoteText;
 	public CharacterController characterController;
 	public GameManager game;
 	
 	// networked variables, automatically replicated from server to clients
 	// -transform.position is implicitly like this
 	public NetworkVariable<Vector2> armPos2D;
+	public NetworkVariable<int> displayEmoteId; // 0 represents none
 	
 	// valid on server + client
 	public int fieldSide; // -1 for z < 0, +1 for z > 0 (+z is blue, -z is orange)
@@ -29,9 +33,9 @@ public class Player : NetworkBehaviour
 	public float lastInputMoveY = 0f;
 	public Vector3 velocity;
 	public Vector3 lastArmVel;
+	public float displayEmoteTimer;
 	
 	// owning-client-only variables
-	float cameraDirection = 1f;
 	public float prevMouseX;
 	public float prevMouseY;
 	public Vector2 clientTargetArmPos2D;
@@ -49,13 +53,7 @@ public class Player : NetworkBehaviour
 		
 		// float forwardDir =  ? 1f : -1f;
 		if (IsClient && IsOwner) {
-			cameraDirection = -(float)fieldSide;
-			if (fieldSide > 0) {
-				Vector3 cam_pos = game.camera.transform.position;
-				Vector3 cam_rot = game.camera.transform.localEulerAngles;
-				game.camera.transform.position = new Vector3(cam_pos.x, cam_pos.y, -cam_pos.z);
-				game.camera.transform.localEulerAngles = new Vector3(cam_rot.x, cam_rot.y + 180, cam_rot.z);
-			}
+			game.SpecifyLocalClientSide(fieldSide);
 		}
 		
 		if (IsClient) {
@@ -68,28 +66,22 @@ public class Player : NetworkBehaviour
 		}
 	}
 	
-	/*public override void OnNetworkSpawn() {
-		base.OnNetworkSpawn();
-		
-		if (IsServer) {
-			// transform.position = new Vector3(0, 10f, 10f);
-			
-		}
-	}*/
-	
 	[Rpc(SendTo.Server, Delivery = RpcDelivery.Unreliable)]
-	void SendPerFrameInputToServerRpc(float moveX, float moveY, float armPosX, float armPosY, Vector3 armVel) {
+	void SendPerFrameInputToServerRpc(float moveX, float moveY, Vector2 armPos, Vector3 armVel, bool jumping) {
 		lastInputMoveX = moveX;
 		lastInputMoveY = moveY;
 		lastArmVel = armVel;
-		armPos2D.Value = new Vector2(armPosX, armPosY);
-	}
-	
-	[Rpc(SendTo.Server, Delivery = RpcDelivery.Unreliable)]
-	void SendJumpInputToServerRpc() {
-		if (characterController.isGrounded) {
+		armPos2D.Value = armPos;
+		
+		if (jumping && characterController.isGrounded) {
 			velocity = new Vector3(velocity.x, 7f, velocity.z);
 		}
+	}
+	
+	[Rpc(SendTo.Server)]
+	void SendShowEmoteRpc(int newEmoteId) {
+		displayEmoteId.Value = newEmoteId;
+		displayEmoteTimer = 2f;
 	}
 	
 	Vector3 ArmPos3DFromArmPos2D(Vector2 arm) {
@@ -117,13 +109,20 @@ public class Player : NetworkBehaviour
 				transform.position = new Vector3(0, 0.5f, (float)fieldSide * 6f);
 				serverHasInitialized = true;
 			}
+			
+			if (displayEmoteId.Value != 0) {
+				displayEmoteTimer -= Time.deltaTime;
+				if (displayEmoteTimer < 0f) {
+					displayEmoteId.Value = 0;
+				}
+			}
 		}
 		
 		if (IsClient && IsOwner && Application.isFocused) {
 			float mouseX = Input.mousePosition.x / (float)Screen.height;
 			float mouseY = Input.mousePosition.y / (float)Screen.height;
-			float mouseDx = cameraDirection * (mouseX - prevMouseX);
-			float mouseDy = cameraDirection * (mouseY - prevMouseY);
+			float mouseDx = game.clientCameraDirection * (mouseX - prevMouseX);
+			float mouseDy = game.clientCameraDirection * (mouseY - prevMouseY);
 			
 			clientTargetArmPos2D += 3f * new Vector2(mouseDx, mouseDy);
 			if (clientTargetArmPos2D.magnitude > 1) {
@@ -131,27 +130,39 @@ public class Player : NetworkBehaviour
 			}
 			
 			Vector2 newClientLazyArmPos2D = Vector2.MoveTowards(clientLazyArmPos2D, clientTargetArmPos2D, 7f*Time.deltaTime);
-			// Vector2 newClientLazyArmPos2D = Vector2.Lerp(clientLazyArmPos2D, clientTargetArmPos2D, 10f*Time.deltaTime);
-			
 			Vector3 oldHandPos = ArmPos3DFromArmPos2D(clientLazyArmPos2D);
 			Vector3 targetHandPos = ArmPos3DFromArmPos2D(newClientLazyArmPos2D);
 			clientLazyArmPos2D = newClientLazyArmPos2D;
 			
 			Vector3 armVel = (targetHandPos - oldHandPos) / Time.deltaTime;
 			
-			float moveX = Input.GetAxis("Horizontal") * cameraDirection;
-			float moveY = Input.GetAxis("Vertical") * cameraDirection;
-			SendPerFrameInputToServerRpc(moveX, moveY, clientLazyArmPos2D.x, clientLazyArmPos2D.y, armVel);
+			float moveX = Input.GetAxis("Horizontal") * game.clientCameraDirection;
+			float moveY = Input.GetAxis("Vertical") * game.clientCameraDirection;
+			
+			bool jumping = Input.GetKey(KeyCode.Space);
+			
+			SendPerFrameInputToServerRpc(moveX, moveY, clientLazyArmPos2D, armVel, jumping);
 			
 			prevMouseX = mouseX;
 			prevMouseY = mouseY;
 			
-			if (Input.GetKey(KeyCode.Space)) {
-				SendJumpInputToServerRpc();
+			// emotes
+			int openEmoteId = 0;
+			if (Input.GetKeyDown(KeyCode.Alpha1)) openEmoteId = 1;
+			if (Input.GetKeyDown(KeyCode.Alpha2)) openEmoteId = 2;
+			if (Input.GetKeyDown(KeyCode.Alpha3)) openEmoteId = 3;
+			if (Input.GetKeyDown(KeyCode.Alpha4)) openEmoteId = 4;
+			if (Input.GetKeyDown(KeyCode.Alpha5)) openEmoteId = 5;
+			if (Input.GetKeyDown(KeyCode.Alpha6)) openEmoteId = 6;
+			if (Input.GetKeyDown(KeyCode.Alpha7)) openEmoteId = 7;
+			if (Input.GetKeyDown(KeyCode.Alpha8)) openEmoteId = 8;
+			if (Input.GetKeyDown(KeyCode.Alpha9)) openEmoteId = 9;
+			if (openEmoteId != 0) {
+				SendShowEmoteRpc(openEmoteId);
 			}
 		}
 		
-		// draw hand
+		// drawing
 		if (IsClient) {
 			float theta = armPos2D.Value.magnitude*armThetaScale;
 			float z = Mathf.Cos(theta);
@@ -164,6 +175,9 @@ public class Player : NetworkBehaviour
 			HandCapsuleOrigin.transform.localEulerAngles = rot;
 			HandVizL.transform.localEulerAngles = rot;
 			HandVizR.transform.localEulerAngles = rot;
+			
+			emoteText.text = emoteFromId[displayEmoteId.Value];
+			emoteText.transform.eulerAngles = new Vector3(45, game.clientCameraDirection < 0 ? 180 : 0, 0); // rotate text to view
 		}
 	}
 }

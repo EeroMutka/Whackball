@@ -21,7 +21,6 @@ public class Ball : NetworkBehaviour
 	void Update()
 	{
 		if (IsServer) {
-			
 			if (!isIdle) {
 				rigidbody.velocity = rigidbody.velocity + new Vector3(0, -5f*Time.deltaTime, 0);
 			}
