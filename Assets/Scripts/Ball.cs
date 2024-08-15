@@ -65,18 +65,4 @@ public class Ball : NetworkBehaviour
 			}
 		}
 	}
-	
-	void OnTriggerEnter(Collider collision)
-	{
-		/*if (IsServer) {
-			Arm arm = collision.gameObject.GetComponent<Arm>();
-			if (arm) {
-				Debug.Log($"Ball collided with arm! {arm.player.lastArmVel}");
-				rigidbody.velocity = 0.5f*arm.player.lastArmVel;
-			}
-			else {
-				
-			}
-		}*/
-	}
 }
